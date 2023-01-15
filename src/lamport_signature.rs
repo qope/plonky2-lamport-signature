@@ -1,28 +1,14 @@
 use anyhow::Result;
 
 use plonky2::{
-    field::{
-        extension::Extendable,
-        goldilocks_field::GoldilocksField,
-        types::{Field, PrimeField64, Sample},
-    },
-    hash::{
-        hash_types::{HashOut, HashOutTarget, RichField},
-        merkle_tree::MerkleTree,
-        poseidon::PoseidonHash,
-    },
-    iop::{
-        target::{BoolTarget, Target},
-        witness::{PartialWitness, WitnessWrite},
-    },
+    field::extension::Extendable,
+    hash::hash_types::{HashOutTarget, RichField},
+    iop::target::{BoolTarget, Target},
     plonk::{
         circuit_builder::CircuitBuilder,
-        circuit_data::CircuitConfig,
-        config::{AlgebraicHasher, GenericConfig, Hasher, PoseidonGoldilocksConfig},
+        config::{AlgebraicHasher, Hasher},
     },
 };
-use rand::RngCore;
-use std::{hash::Hash, time::Instant};
 
 pub fn verify<F: RichField, H: Hasher<F>>(
     c: &H::Hash,
@@ -179,20 +165,26 @@ fn log2(n: usize) -> usize {
     return p;
 }
 
-fn u64_to_vec(x: u64) -> Vec<bool> {
-    let mut x = x;
-    let mut v = vec![];
-    for _ in 0..64 {
-        v.push((x & 1) == 1);
-        x >>= 1;
-    }
-    v
-}
-
 #[cfg(test)]
 mod tests {
 
     use super::*;
+
+    use plonky2::{
+        field::{goldilocks_field::GoldilocksField, types::Sample},
+        hash::{hash_types::HashOut, poseidon::PoseidonHash},
+        iop::{
+            target::{BoolTarget, Target},
+            witness::{PartialWitness, WitnessWrite},
+        },
+        plonk::{
+            circuit_builder::CircuitBuilder,
+            circuit_data::CircuitConfig,
+            config::{Hasher, PoseidonGoldilocksConfig},
+        },
+    };
+    use rand::RngCore;
+    use std::time::Instant;
 
     const D: usize = 2;
     type C = PoseidonGoldilocksConfig;
@@ -200,15 +192,9 @@ mod tests {
     type H = PoseidonHash;
 
     #[test]
-    fn test_rust() {
-        let v1 = vec![1, 2];
-        let v2 = vec![1, 2];
-    }
-
-    #[test]
     fn test_commit() {
         let n = 9;
-        let image: Vec<HashOut<F>> = (0..1 << n).map(|x| HashOut::ZERO).collect();
+        let image: Vec<HashOut<F>> = (0..1 << n).map(|_| HashOut::ZERO).collect();
         dbg!(commit::<F, H>(&image));
     }
 
@@ -325,10 +311,13 @@ mod tests {
 
         let data = builder.build::<C>();
 
+        let now = Instant::now();
         match data.prove(pw) {
             Ok(_) => Ok(()),
             _ => Err("prove failed"),
         }?;
+        dbg!(now.elapsed().as_millis());
+        dbg!(data.common.degree_bits());
         Ok(())
     }
 }
